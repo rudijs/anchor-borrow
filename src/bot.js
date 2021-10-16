@@ -29,14 +29,36 @@ export class Bot {
     this.provider = columbus5
     this.addressProvider = new AddressProviderFromJson(this.provider)
     this.anchor = new Anchor(this.client, this.addressProvider)
+
+    this.config = {
+      ltv: {
+        // This define the limit when the bot will repay your debt.
+        limit: process.env.LTV_LIMIT || 48, //53,
+
+        // This define the safe-limit that the bot will reach when repaying or borrowing more.
+        safe: process.env.LTV_SAFE || 40, //45,
+
+        // This define the low-limit when the bot will borrow more.
+        borrow: process.env.LTV_BORROW || 35, //40,
+      },
+    }
+
+    this.borrowState = {}
+    this.balanceState = {}
+  }
+
+  async getBalanceState() {
+    const coins = await this.client.bank.balance(this.wallet.key.accAddress)
+    this.balanceState.total_account_balance_in_luna = coins.get("uluna").amount.dividedBy(MICRO_MULTIPLIER)
+
+    const balanceInfo = await this.anchorEarn.balance({ currencies: [DENOMS.UST] })
+    this.balanceState.total_account_balance_in_ust = new Decimal(balanceInfo.total_account_balance_in_ust)
+    this.balanceState.total_deposit_balance_in_ust = new Decimal(balanceInfo.total_deposit_balance_in_ust)
+    // console.log(balanceInfo)
   }
 
   // terra wallet balance
-  async getBorrowBalance() {
-    // const coins = await this.client.bank.balance(this.wallet.key.accAddress)
-    // console.log(coins)
-    // coins.get("uusd").amount.dividedBy(MICRO_MULTIPLIER)
-
+  async getBorrowState() {
     const walletDenom = {
       address: this.wallet.key.accAddress,
       market: "UST",
@@ -44,12 +66,15 @@ export class Bot {
 
     const borrowedValue = new Decimal(await this.anchor.borrow.getBorrowedValue(walletDenom))
     // console.log("borrowed value:", borrowedValue)
+    this.borrowState.borrowedValue = borrowedValue
 
     const borrowLimit = new Decimal(await this.anchor.borrow.getBorrowLimit(walletDenom))
     // console.log("borrow Limit:", borrowLimit)
+    this.borrowState.borrowLimit = borrowLimit
 
     const ltv = borrowedValue.dividedBy(borrowLimit.times(10).dividedBy(6)).times(100)
     // console.log("ltv:", ltv)
+    this.borrowState.ltv = ltv
 
     return {
       // uusd: coins.get("uusd").amount.dividedBy(MICRO_MULTIPLIER),
@@ -59,10 +84,36 @@ export class Bot {
     }
   }
 
+  info() {
+    console.log("Balance State:")
+    console.log(this.balanceState)
+
+    console.log("Borrow State:")
+    console.log(this.borrowState)
+
+    console.log("Config:")
+    console.log(this.config)
+    // console.log("Borrowed:,", this.borrowState.borrowedValue)
+    // console.log("Borrow Limit:", this.borrowState.borrowLimit)
+    // console.log("LTV:", this.borrowState.ltv)
+  }
+
   // anchor dapp balance
   async getAnchorBalance() {
     const balanceInfo = await this.anchorEarn.balance({ currencies: [DENOMS.UST] })
     // console.log(balanceInfo)
     return balanceInfo.balances
+  }
+
+  async computeAmountToBorrow(target = this.config.ltv.safe) {
+    console.log("borrow target:", target)
+    return new Decimal(target).times(this.borrowState.borrowLimit.times(10).dividedBy(6)).dividedBy(100).minus(this.borrowState.borrowedValue)
+  }
+
+  async computeAmountToRepay(target = this.config.ltv.safe) {
+    console.log("repay target:", target)
+    const amountForSafeZone = new Decimal(target).times(this.borrowState.borrowLimit.times(10).dividedBy(6)).dividedBy(100)
+    // console.log(amountForSafeZone)
+    return this.borrowState.borrowedValue.minus(amountForSafeZone)
   }
 }
