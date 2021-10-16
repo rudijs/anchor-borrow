@@ -1,0 +1,19 @@
+{
+  "name": "luna-tmp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anchor-protocol/anchor-earn": "^1.0.4",
+    "@anchor-protocol/anchor.js": "^1.2.0",
+    "@terra-money/terra.js": "^2.0.14",
+    "decimal.js": "^10.3.1"
+  }
+}
