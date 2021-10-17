@@ -1,5 +1,5 @@
 import { LCDClient, MnemonicKey } from "@terra-money/terra.js"
-import { Anchor, columbus5, AddressProviderFromJson } from "@anchor-protocol/anchor.js"
+import { Anchor, columbus5, AddressProviderFromJson, COLLATERAL_DENOMS } from "@anchor-protocol/anchor.js"
 import { AnchorEarn, CHAINS, NETWORKS, DENOMS } from "@anchor-protocol/anchor-earn"
 import Decimal from "decimal.js"
 
@@ -64,6 +64,13 @@ export class Bot {
       market: "UST",
     }
 
+    const collaterals = await this.anchor.borrow.getCollaterals({ address: this.wallet.key.accAddress, market: COLLATERAL_DENOMS.UBLUNA })
+    const b = collaterals.filter((item) => item.collateral === this.addressProvider.bLunaToken())
+    // console.log(b)
+    const bLunaCollateral = new Decimal(b[0].balance).dividedBy(MICRO_MULTIPLIER)
+    // console.log(bLunaCollateral)
+    this.borrowState.bLunaCollateral = bLunaCollateral
+
     const borrowedValue = new Decimal(await this.anchor.borrow.getBorrowedValue(walletDenom))
     // console.log("borrowed value:", borrowedValue)
     this.borrowState.borrowedValue = borrowedValue
@@ -116,4 +123,10 @@ export class Bot {
     // console.log(amountForSafeZone)
     return this.borrowState.borrowedValue.minus(amountForSafeZone)
   }
+
+  // 	computeBorrowMessage(amount) {
+  // 	return this.#anchor.borrow
+  // 		.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
+  // 		.generateWithWallet(this.#wallet)
+  // }
 }
