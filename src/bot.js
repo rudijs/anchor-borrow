@@ -83,6 +83,9 @@ export class Bot {
     // console.log("ltv:", ltv)
     this.borrowState.ltv = ltv
 
+    const currentBlunaLiquidationEstimate = borrowedValue.mul(1.666666).dividedBy(bLunaCollateral)
+    this.borrowState.currentBlunaLiquidationEstimate = currentBlunaLiquidationEstimate
+
     return {
       // uusd: coins.get("uusd").amount.dividedBy(MICRO_MULTIPLIER),
       borrowedValue,

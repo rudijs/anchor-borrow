@@ -14,7 +14,12 @@ async function main() {
 
   if (bot.borrowState.ltv < bot.config.ltv.borrow) {
     console.log("borrow more")
-    console.log("borrow amout:", await bot.computeAmountToBorrow())
+    const amountToBorrow = await bot.computeAmountToBorrow()
+    console.log("borrow amout:", amountToBorrow)
+    const newBorrowTotal = bot.borrowState.borrowedValue.plus(amountToBorrow)
+    console.log("new borrow total", newBorrowTotal)
+    const newBlunaLiquidationEstimate = newBorrowTotal.mul(1.666666).dividedBy(bot.borrowState.bLunaCollateral)
+    console.log("newBlunaLiquidationEstimate", newBlunaLiquidationEstimate)
   }
 
   if (bot.borrowState.ltv > bot.config.ltv.limit) {
