@@ -1,5 +1,5 @@
 import { LCDClient, MnemonicKey } from "@terra-money/terra.js"
-import { Anchor, columbus5, AddressProviderFromJson, COLLATERAL_DENOMS } from "@anchor-protocol/anchor.js"
+import { Anchor, columbus5, AddressProviderFromJson, COLLATERAL_DENOMS, queryRewardAccrued, MARKET_DENOMS } from "@anchor-protocol/anchor.js"
 import { AnchorEarn, CHAINS, NETWORKS, DENOMS } from "@anchor-protocol/anchor-earn"
 import Decimal from "decimal.js"
 
@@ -55,6 +55,9 @@ export class Bot {
     this.balanceState.total_account_balance_in_ust = new Decimal(balanceInfo.total_account_balance_in_ust)
     this.balanceState.total_deposit_balance_in_ust = new Decimal(balanceInfo.total_deposit_balance_in_ust)
     // console.log(balanceInfo)
+
+    const earnAPY = await this.anchor.earn.getAPY({ market: MARKET_DENOMS.UUSD })
+    this.balanceState.earnAPY = new Decimal(new Decimal(earnAPY).mul(100).toFixed(2))
   }
 
   // terra wallet balance
@@ -66,28 +69,27 @@ export class Bot {
 
     const collaterals = await this.anchor.borrow.getCollaterals({ address: this.wallet.key.accAddress, market: COLLATERAL_DENOMS.UBLUNA })
     const b = collaterals.filter((item) => item.collateral === this.addressProvider.bLunaToken())
-    // console.log(b)
     const bLunaCollateral = new Decimal(b[0].balance).dividedBy(MICRO_MULTIPLIER)
-    // console.log(bLunaCollateral)
     this.borrowState.bLunaCollateral = bLunaCollateral
 
     const borrowedValue = new Decimal(await this.anchor.borrow.getBorrowedValue(walletDenom))
-    // console.log("borrowed value:", borrowedValue)
     this.borrowState.borrowedValue = borrowedValue
 
     const borrowLimit = new Decimal(await this.anchor.borrow.getBorrowLimit(walletDenom))
-    // console.log("borrow Limit:", borrowLimit)
     this.borrowState.borrowLimit = borrowLimit
 
     const ltv = borrowedValue.dividedBy(borrowLimit.times(10).dividedBy(6)).times(100)
-    // console.log("ltv:", ltv)
     this.borrowState.ltv = ltv
 
     const currentBlunaLiquidationEstimate = borrowedValue.mul(1.666666).dividedBy(bLunaCollateral)
     this.borrowState.currentBlunaLiquidationEstimate = currentBlunaLiquidationEstimate
 
+    // TODO: not sure if this is correct, to check
+    const q = queryRewardAccrued({ lcd: this.client, address: this.wallet.key.accAddress })
+    const ancRewardsValue = await q(this.addressProvider)
+    this.borrowState.ancRewardsValue = new Decimal(ancRewardsValue.rewards).dividedBy(10000)
+
     return {
-      // uusd: coins.get("uusd").amount.dividedBy(MICRO_MULTIPLIER),
       borrowedValue,
       borrowLimit,
       ltv,
