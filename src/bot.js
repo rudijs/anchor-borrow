@@ -58,6 +58,14 @@ export class Bot {
 
     const earnAPY = await this.anchor.earn.getAPY({ market: MARKET_DENOMS.UUSD })
     this.balanceState.earnAPY = new Decimal(new Decimal(earnAPY).mul(100).toFixed(2))
+
+    const anchorBalance = new Decimal(await this.anchor.anchorToken.getBalance(this.wallet.key.accAddress))
+    this.balanceState.balance_in_anc = anchorBalance
+
+    const ancPrice = new Decimal(await this.anchor.anchorToken.getANCPrice())
+    this.balanceState.ancPrice = ancPrice
+
+    this.balanceState.total_anc_balance_in_ust = anchorBalance.mul(ancPrice)
   }
 
   // terra wallet balance
