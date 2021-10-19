@@ -12,6 +12,7 @@ async function main() {
 
   console.log("Action")
 
+  // borrow
   if (bot.borrowState.ltv < bot.config.ltv.borrow) {
     console.log("borrow more")
     const amountToBorrow = await bot.computeAmountToBorrow()
@@ -20,20 +21,22 @@ async function main() {
     console.log("new borrow total", newBorrowTotal)
     const newBlunaLiquidationEstimate = newBorrowTotal.mul(1.666666).dividedBy(bot.borrowState.bLunaCollateral)
     console.log("newBlunaLiquidationEstimate", newBlunaLiquidationEstimate)
+
+    // console.log(await bot.borrow(amountToBorrow))
   }
-
-  if (bot.borrowState.ltv > bot.config.ltv.limit) {
-    console.log("repay")
-    console.log("repay amount:", await bot.computeAmountToRepay())
-  }
-
-  // check borrow position state
-  // console.log(await bot.getBorrowBalance())
-  // console.log(await bot.getAnchorBalance())
-
-  // borrow
 
   // repay
+  if (bot.borrowState.ltv > bot.config.ltv.limit) {
+    console.log("repay")
+    const amountToRepay = await bot.computeAmountToRepay()
+    console.log("repay amount:", amountToRepay)
+    console.log(await bot.repay(amountToRepay))
+  }
+
+  // nothing to do
+  if (bot.borrowState.ltv > bot.config.ltv.borrow && bot.borrowState.ltv < bot.config.ltv.limit) {
+    console.log("Nothing to do")
+  }
 }
 
 main()

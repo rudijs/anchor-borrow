@@ -1,4 +1,4 @@
-import { LCDClient, MnemonicKey } from "@terra-money/terra.js"
+import { LCDClient, MnemonicKey, StdFee } from "@terra-money/terra.js"
 import { Anchor, columbus5, AddressProviderFromJson, COLLATERAL_DENOMS, queryRewardAccrued, MARKET_DENOMS } from "@anchor-protocol/anchor.js"
 import { AnchorEarn, CHAINS, NETWORKS, DENOMS } from "@anchor-protocol/anchor-earn"
 import Decimal from "decimal.js"
@@ -33,13 +33,13 @@ export class Bot {
     this.config = {
       ltv: {
         // This define the limit when the bot will repay your debt.
-        limit: process.env.LTV_LIMIT || 48, //53,
+        limit: process.env.LTV_LIMIT || 35, //48, //53,
 
         // This define the safe-limit that the bot will reach when repaying or borrowing more.
-        safe: process.env.LTV_SAFE || 40, //45,
+        safe: process.env.LTV_SAFE || 30, // 40, //45,
 
         // This define the low-limit when the bot will borrow more.
-        borrow: process.env.LTV_BORROW || 35, //40,
+        borrow: process.env.LTV_BORROW || 20, //35, //40,
       },
     }
 
@@ -51,10 +51,14 @@ export class Bot {
     const coins = await this.client.bank.balance(this.wallet.key.accAddress)
     this.balanceState.total_account_balance_in_luna = coins.get("uluna").amount.dividedBy(MICRO_MULTIPLIER)
 
-    const balanceInfo = await this.anchorEarn.balance({ currencies: [DENOMS.UST] })
-    this.balanceState.total_account_balance_in_ust = new Decimal(balanceInfo.total_account_balance_in_ust)
-    this.balanceState.total_deposit_balance_in_ust = new Decimal(balanceInfo.total_deposit_balance_in_ust)
-    // console.log(balanceInfo)
+    try {
+      const balanceInfo = await this.anchorEarn.balance({ currencies: [DENOMS.UST] })
+      this.balanceState.total_account_balance_in_ust = new Decimal(balanceInfo.total_account_balance_in_ust)
+      this.balanceState.total_deposit_balance_in_ust = new Decimal(balanceInfo.total_deposit_balance_in_ust)
+      // console.log(balanceInfo)
+    } catch (e) {
+      console.log("No Earn balances")
+    }
 
     const earnAPY = await this.anchor.earn.getAPY({ market: MARKET_DENOMS.UUSD })
     this.balanceState.earnAPY = new Decimal(new Decimal(earnAPY).mul(100).toFixed(2))
@@ -93,9 +97,9 @@ export class Bot {
     this.borrowState.currentBlunaLiquidationEstimate = currentBlunaLiquidationEstimate
 
     // TODO: not sure if this is correct, to check
-    const q = queryRewardAccrued({ lcd: this.client, address: this.wallet.key.accAddress })
-    const ancRewardsValue = await q(this.addressProvider)
-    this.borrowState.ancRewardsValue = new Decimal(ancRewardsValue.rewards).dividedBy(10000)
+    // const q = queryRewardAccrued({ lcd: this.client, address: this.wallet.key.accAddress })
+    // const ancRewardsValue = await q(this.addressProvider)
+    // this.borrowState.ancRewardsValue = new Decimal(ancRewardsValue.rewards).dividedBy(10000)
 
     return {
       borrowedValue,
@@ -137,9 +141,30 @@ export class Bot {
     return this.borrowState.borrowedValue.minus(amountForSafeZone)
   }
 
-  // 	computeBorrowMessage(amount) {
-  // 	return this.#anchor.borrow
-  // 		.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
-  // 		.generateWithWallet(this.#wallet)
-  // }
+  computeBorrowMessage(amount) {
+    return this.anchor.borrow.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).generateWithWallet(this.wallet)
+  }
+
+  async borrow(amount) {
+    const msg = this.computeBorrowMessage(amount)
+    // console.log(101, msg)
+    // const tx = await this.wallet.createAndSignTx({ msgs: msg, fee: new StdFee(600_000, { uusd: 90_000 }) })
+    const tx = await this.wallet.createAndSignTx({ msgs: msg, fee: new StdFee(600_000, { uusd: 228_000 }) })
+    // console.log(201, tx)
+    const res = await this.client.tx.broadcast(tx)
+    return res
+  }
+
+  computeRepayMessage(amount) {
+    return this.anchor.borrow.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).generateWithWallet(this.wallet)
+  }
+
+  async repay(amount) {
+    const msg = this.computeRepayMessage(amount)
+    // console.log(101, msg)
+    const tx = await this.wallet.createAndSignTx({ msgs: msg, fee: new StdFee(600_000, { uusd: 228_000 + 60_000 }) })
+    // console.log(201, tx)
+    const res = await this.client.tx.broadcast(tx)
+    return res
+  }
 }
